@@ -69,8 +69,10 @@ app.post('/whatsapp', async (req, res) => {
     res.end(twiml.toString());
 
     // DESPUÉS de responder, verificar si se confirmó un pedido con tarjeta
-    if (aiResponse.toLowerCase().includes('pedido confirmado') && 
-        aiResponse.toLowerCase().includes('tarjeta')) {
+    if ((aiResponse.toLowerCase().includes('confirmado exitosamente') || 
+         aiResponse.toLowerCase().includes('pedido confirmado')) && 
+        (aiResponse.toLowerCase().includes('tarjeta') ||
+         aiResponse.toLowerCase().includes('mercado pago'))) {
       
       try {
         console.log('💳 Detectado pedido con pago por tarjeta, generando link...');
