@@ -64,9 +64,88 @@ app.post('/whatsapp', async (req, res) => {
     // Logging
     console.log(`🤖 Respuesta: ${aiResponse.substring(0, 100)}...`);
 
-    // Responder a Twilio
+    // Responder a Twilio primero
     res.writeHead(200, { 'Content-Type': 'text/xml' });
     res.end(twiml.toString());
+
+    // DESPUÉS de responder, verificar si se confirmó un pedido con tarjeta
+    if (aiResponse.toLowerCase().includes('pedido confirmado') && 
+        aiResponse.toLowerCase().includes('tarjeta')) {
+      
+      try {
+        console.log('💳 Detectado pedido con pago por tarjeta, generando link...');
+        
+        // Extraer resumen del pedido
+        const orderSummary = await aiAssistant.extractOrderSummary(phoneNumber);
+        
+        if (orderSummary && orderSummary.items && orderSummary.items.length > 0) {
+          // Generar número de pedido
+          const orderId = `PARM-${Date.now().toString().slice(-4)}`;
+          
+          // Preparar datos del pedido para Mercado Pago
+          const orderData = {
+            id: orderId,
+            phoneNumber: phoneNumber,
+            items: orderSummary.items,
+            total: orderSummary.total,
+            deliveryAddress: orderSummary.delivery_address || 'Por confirmar',
+            customerName: orderSummary.customer_name || 'Cliente',
+            paymentMethod: 'card'
+          };
+          
+          // Crear pedido en el sistema
+          await orderManager.createOrder(orderId, {
+            phoneNumber: phoneNumber,
+            items: orderSummary.items,
+            total: orderSummary.total,
+            deliveryAddress: orderData.deliveryAddress,
+            paymentMethod: 'card',
+            status: 'pending_payment'
+          });
+          
+          console.log(`📋 Pedido ${orderId} creado en el sistema`);
+          
+          // Generar link de pago con Mercado Pago
+          const paymentResult = await mercadoPago.generarLinkPago(orderData);
+          
+          if (paymentResult.success) {
+            const paymentLink = paymentResult.sandboxLink || paymentResult.paymentLink;
+            console.log(`💳 Link de pago generado: ${paymentLink}`);
+            
+            // Enviar link por WhatsApp (mensaje separado)
+            if (twilioClient && process.env.TWILIO_WHATSAPP_NUMBER) {
+              await twilioClient.messages.create({
+                body: `🔗 *LINK DE PAGO SEGURO*\n\n` +
+                      `Pedido #${orderId}\n` +
+                      `Total: $${orderSummary.total}\n\n` +
+                      `👉 ${paymentLink}\n\n` +
+                      `✅ Link válido por 24 horas\n` +
+                      `🔒 Pago 100% seguro con Mercado Pago`,
+                from: process.env.TWILIO_WHATSAPP_NUMBER,
+                to: fromNumber
+              });
+              
+              console.log('✅ Link de pago enviado por WhatsApp');
+            }
+          } else {
+            throw new Error(`Error de Mercado Pago: ${paymentResult.error}`);
+          }
+        }
+        
+      } catch (error) {
+        console.error('❌ Error generando/enviando link de pago:', error);
+        
+        // Enviar mensaje de error al cliente
+        if (twilioClient && process.env.TWILIO_WHATSAPP_NUMBER) {
+          await twilioClient.messages.create({
+            body: '❌ Hubo un problema generando el link de pago. ' +
+                  'Por favor llama al 828-284-0040 para completar tu pedido.',
+            from: process.env.TWILIO_WHATSAPP_NUMBER,
+            to: fromNumber
+          });
+        }
+      }
+    }
 
   } catch (error) {
     console.error('❌ Error procesando mensaje:', error);
