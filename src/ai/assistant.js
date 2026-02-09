@@ -188,12 +188,14 @@ Tú: "¡Perfecto! 🎉 Tu pedido ha sido confirmado.
         messages: [
           {
             role: 'user',
-            content: `Analiza esta conversación y extrae SOLO el pedido actual en formato JSON:
-            
+            content: `Analiza esta conversación y extrae SOLO el pedido actual en formato JSON.
+
 Conversación:
 ${JSON.stringify(history, null, 2)}
 
-Responde ÚNICAMENTE con JSON en este formato:
+IMPORTANTE: Responde ÚNICAMENTE con el JSON puro, sin markdown, sin \`\`\`json, sin asteriscos, sin nada más.
+
+Formato requerido:
 {
   "items": [
     {"name": "Pizza Parmesana", "size": "Grande", "quantity": 1, "price": 270, "extras": []},
@@ -204,13 +206,24 @@ Responde ÚNICAMENTE con JSON en este formato:
   "customer_name": "Juan"
 }
 
-Si no hay pedido confirmado, responde: {"items": [], "total": 0}`
+Si no hay pedido confirmado, responde: {"items": [], "total": 0}
+
+Responde SOLO con el JSON, nada más.`
           }
         ]
       });
 
       const jsonText = response.content[0].text;
-      return JSON.parse(jsonText);
+      
+      // Limpiar markdown (```json, ```, ***, etc)
+      const cleanJson = jsonText
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .replace(/\*\*\*json\n?/g, '')
+        .replace(/\*\*\*\n?/g, '')
+        .trim();
+      
+      return JSON.parse(cleanJson);
 
     } catch (error) {
       console.error('Error extrayendo pedido:', error);
