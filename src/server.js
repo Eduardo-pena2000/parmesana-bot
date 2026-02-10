@@ -68,6 +68,13 @@ app.post('/whatsapp', async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/xml' });
     res.end(twiml.toString());
 
+    // DEBUG: Ver qué contiene la respuesta
+    console.log('🔍 DEBUG - Verificando respuesta para detección de pedido:');
+    console.log('   Contiene "confirmado exitosamente"?', aiResponse.toLowerCase().includes('confirmado exitosamente'));
+    console.log('   Contiene "pedido confirmado"?', aiResponse.toLowerCase().includes('pedido confirmado'));
+    console.log('   Contiene "tarjeta"?', aiResponse.toLowerCase().includes('tarjeta'));
+    console.log('   Contiene "mercado pago"?', aiResponse.toLowerCase().includes('mercado pago'));
+
     // DESPUÉS de responder, verificar si se confirmó un pedido con tarjeta
     if ((aiResponse.toLowerCase().includes('confirmado exitosamente') || 
          aiResponse.toLowerCase().includes('pedido confirmado')) && 
